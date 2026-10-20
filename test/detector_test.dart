@@ -54,7 +54,8 @@ void main() {
       await backCam.dispose();
 
       // Desktop / Webcam (0°)
-      final webcam = OpticalFlowDetector(sensorOrientation: 0, isFrontCamera: true);
+      final webcam =
+          OpticalFlowDetector(sensorOrientation: 0, isFrontCamera: true);
       expect(webcam.swapAxes, isFalse);
       expect(webcam.invertX, isTrue);
       expect(webcam.invertY, isFalse);

@@ -98,8 +98,8 @@ class OpticalFlowDetector implements TouchlessDetector {
   })  : _alpha = smoothingFactor.clamp(0.05, 0.95),
         _swipeSensitivity = swipeSensitivity,
         _swipeCooldown = swipeCooldown,
-        swapAxes = swapAxes ??
-            (sensorOrientation == 90 || sensorOrientation == 270),
+        swapAxes =
+            swapAxes ?? (sensorOrientation == 90 || sensorOrientation == 270),
         invertX = invertX ??
             (sensorOrientation == 270
                 ? true

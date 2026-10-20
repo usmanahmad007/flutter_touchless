@@ -32,6 +32,7 @@ example/build/
 example/.dart_tool/
 example/.flutter-plugins
 example/.flutter-plugins-dependencies
+coverage/
 
 # Android related
 **/android/.gradle/

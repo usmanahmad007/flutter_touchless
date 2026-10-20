@@ -184,7 +184,8 @@ class _TouchlessMediaPlayerScreenState extends State<TouchlessMediaPlayerScreen>
     );
 
     // Listen to touchless gestures
-    _gestureSub = _touchlessController.gestureStream.listen(_handleTouchlessGesture);
+    _gestureSub =
+        _touchlessController.gestureStream.listen(_handleTouchlessGesture);
 
     // Start playback timer
     _startPlaybackTicker();
@@ -287,7 +288,8 @@ class _TouchlessMediaPlayerScreenState extends State<TouchlessMediaPlayerScreen>
 
     _showGestureHud(
       title: 'NEXT TRACK ⏭️',
-      subtitle: '${_playlist[_currentTrackIndex].title} • ${_playlist[_currentTrackIndex].artist}',
+      subtitle:
+          '${_playlist[_currentTrackIndex].title} • ${_playlist[_currentTrackIndex].artist}',
       icon: Icons.skip_next_rounded,
       color: const Color(0xFF00E5FF),
     );
@@ -307,7 +309,8 @@ class _TouchlessMediaPlayerScreenState extends State<TouchlessMediaPlayerScreen>
 
     _showGestureHud(
       title: 'PREVIOUS TRACK ⏮️',
-      subtitle: '${_playlist[_currentTrackIndex].title} • ${_playlist[_currentTrackIndex].artist}',
+      subtitle:
+          '${_playlist[_currentTrackIndex].title} • ${_playlist[_currentTrackIndex].artist}',
       icon: Icons.skip_previous_rounded,
       color: const Color(0xFF7C4DFF),
     );
@@ -452,293 +455,313 @@ class _TouchlessMediaPlayerScreenState extends State<TouchlessMediaPlayerScreen>
             child: Stack(
               children: [
                 // Main Media Player Body
-                Column(
-                  children: [
-                    const SizedBox(height: 52), // Space for top status bar
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isCompact = constraints.maxHeight < 720;
+                    final artworkSize = isCompact ? 160.0 : 220.0;
+                    return Column(
+                      children: [
+                        const SizedBox(height: 52), // Space for top status bar
 
-                    // Header: Playlist and Calibration Actions
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.queue_music, color: Colors.white70),
-                            onPressed: _openPlaylistDrawer,
-                            tooltip: 'Playlist',
+                        // Header: Playlist and Calibration Actions
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.queue_music,
+                                    color: Colors.white70),
+                                onPressed: _openPlaylistDrawer,
+                                tooltip: 'Playlist',
+                              ),
+                              Column(
+                                children: [
+                                  Text(
+                                    'TOUCHLESS AUDIO PLAYER',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 2.0,
+                                      color: currentTrack.gradient[0],
+                                    ),
+                                  ),
+                                  Text(
+                                    currentTrack.genre,
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      letterSpacing: 1.5,
+                                      color: Colors.white38,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.tune,
+                                    color: Colors.white70),
+                                onPressed: _openEngineCalibrationModal,
+                                tooltip: 'Sensor Calibration',
+                              ),
+                            ],
                           ),
-                          Column(
+                        ),
+
+                        const Spacer(flex: 1),
+
+                        // Album Artwork Card with Touchless Dwell-Click Target
+                        Center(
+                          child: TouchlessTarget(
+                            id: 'album_artwork_play_toggle',
+                            onTouchlessTap: _togglePlayPause,
+                            onTap: _togglePlayPause,
+                            child: _buildAlbumArtworkCard(currentTrack,
+                                size: artworkSize),
+                          ),
+                        ),
+
+                        const Spacer(flex: 1),
+
+                        // Song Title & Artist
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Column(
                             children: [
                               Text(
-                                'TOUCHLESS AUDIO PLAYER',
-                                style: TextStyle(
-                                  fontSize: 11,
+                                currentTrack.title,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 26,
                                   fontWeight: FontWeight.bold,
-                                  letterSpacing: 2.0,
-                                  color: currentTrack.gradient[0],
+                                  color: Colors.white,
+                                  letterSpacing: 0.5,
                                 ),
                               ),
+                              const SizedBox(height: 6),
                               Text(
-                                currentTrack.genre,
+                                '${currentTrack.artist} — ${currentTrack.album}',
+                                textAlign: TextAlign.center,
                                 style: const TextStyle(
-                                  fontSize: 10,
-                                  letterSpacing: 1.5,
-                                  color: Colors.white38,
+                                  fontSize: 14,
+                                  color: Colors.white60,
                                 ),
                               ),
                             ],
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.tune, color: Colors.white70),
-                            onPressed: _openEngineCalibrationModal,
-                            tooltip: 'Sensor Calibration',
-                          ),
-                        ],
-                      ),
-                    ),
+                        ),
 
-                    const Spacer(flex: 1),
+                        const SizedBox(height: 16),
 
-                    // Album Artwork Card with Touchless Dwell-Click Target
-                    Center(
-                      child: TouchlessTarget(
-                        id: 'album_artwork_play_toggle',
-                        onTouchlessTap: _togglePlayPause,
-                        onTap: _togglePlayPause,
-                        child: _buildAlbumArtworkCard(currentTrack),
-                      ),
-                    ),
-
-                    const Spacer(flex: 1),
-
-                    // Song Title & Artist
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Column(
-                        children: [
-                          Text(
-                            currentTrack.title,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            '${currentTrack.artist} — ${currentTrack.album}',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.white60,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Animated Real-Time Audio Rhythm Visualizer
-                    SizedBox(
-                      height: 40,
-                      width: double.infinity,
-                      child: AnimatedBuilder(
-                        animation: _visualizerAnim,
-                        builder: (context, _) {
-                          return CustomPaint(
-                            painter: _AudioVisualizerPainter(
-                              isPlaying: _isPlaying,
-                              animValue: _visualizerAnim.value,
-                              primaryColor: currentTrack.gradient[0],
-                              secondaryColor: currentTrack.gradient[1],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    // Seek Progress Bar & Time
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Column(
-                        children: [
-                          SliderTheme(
-                            data: SliderTheme.of(context).copyWith(
-                              activeTrackColor: currentTrack.gradient[0],
-                              inactiveTrackColor: Colors.white12,
-                              thumbColor: Colors.white,
-                              thumbShape: const RoundSliderThumbShape(
-                                  enabledThumbRadius: 6),
-                              overlayShape: const RoundSliderOverlayShape(
-                                  overlayRadius: 14),
-                              trackHeight: 3,
-                            ),
-                            child: Slider(
-                              value: _currentPosition.inSeconds
-                                  .toDouble()
-                                  .clamp(0.0, currentTrack.duration.inSeconds.toDouble()),
-                              min: 0,
-                              max: currentTrack.duration.inSeconds.toDouble(),
-                              onChanged: (val) {
-                                setState(() {
-                                  _currentPosition = Duration(seconds: val.round());
-                                });
-                              },
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  _formatDuration(_currentPosition),
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.white38,
-                                  ),
+                        // Animated Real-Time Audio Rhythm Visualizer
+                        SizedBox(
+                          height: 40,
+                          width: double.infinity,
+                          child: AnimatedBuilder(
+                            animation: _visualizerAnim,
+                            builder: (context, _) {
+                              return CustomPaint(
+                                painter: _AudioVisualizerPainter(
+                                  isPlaying: _isPlaying,
+                                  animValue: _visualizerAnim.value,
+                                  primaryColor: currentTrack.gradient[0],
+                                  secondaryColor: currentTrack.gradient[1],
                                 ),
-                                Text(
-                                  _formatDuration(currentTrack.duration),
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.white38,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    // Primary Playback Controls with Touchless Air Targets
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          // Shuffle Button
-                          IconButton(
-                            icon: Icon(
-                              Icons.shuffle,
-                              color: _isShuffle
-                                  ? currentTrack.gradient[0]
-                                  : Colors.white38,
-                            ),
-                            onPressed: () {
-                              setState(() => _isShuffle = !_isShuffle);
-                              _showGestureHud(
-                                title: _isShuffle ? 'SHUFFLE ON' : 'SHUFFLE OFF',
-                                subtitle: 'Playlist randomizer',
-                                icon: Icons.shuffle,
-                                color: currentTrack.gradient[0],
                               );
                             },
                           ),
+                        ),
 
-                          // Previous Track Air Target
-                          TouchlessTarget(
-                            id: 'btn_prev_track',
-                            onTouchlessTap: _prevTrack,
-                            onTap: _prevTrack,
-                            child: _buildControlBubble(
-                              icon: Icons.skip_previous_rounded,
-                              size: 28,
-                              onTap: _prevTrack,
-                            ),
-                          ),
+                        const SizedBox(height: 12),
 
-                          // Giant Central Play/Pause Air Target
-                          TouchlessTarget(
-                            id: 'btn_play_pause_center',
-                            onTouchlessTap: _togglePlayPause,
-                            onTap: _togglePlayPause,
-                            child: Container(
-                              width: 76,
-                              height: 76,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: LinearGradient(
-                                  colors: currentTrack.gradient,
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
+                        // Seek Progress Bar & Time
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Column(
+                            children: [
+                              SliderTheme(
+                                data: SliderTheme.of(context).copyWith(
+                                  activeTrackColor: currentTrack.gradient[0],
+                                  inactiveTrackColor: Colors.white12,
+                                  thumbColor: Colors.white,
+                                  thumbShape: const RoundSliderThumbShape(
+                                      enabledThumbRadius: 6),
+                                  overlayShape: const RoundSliderOverlayShape(
+                                      overlayRadius: 14),
+                                  trackHeight: 3,
                                 ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: currentTrack.gradient[0].withAlpha(120),
-                                    blurRadius: 24,
-                                    spreadRadius: 2,
-                                  ),
-                                ],
+                                child: Slider(
+                                  value: _currentPosition.inSeconds
+                                      .toDouble()
+                                      .clamp(
+                                          0.0,
+                                          currentTrack.duration.inSeconds
+                                              .toDouble()),
+                                  min: 0,
+                                  max: currentTrack.duration.inSeconds
+                                      .toDouble(),
+                                  onChanged: (val) {
+                                    setState(() {
+                                      _currentPosition =
+                                          Duration(seconds: val.round());
+                                    });
+                                  },
+                                ),
                               ),
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  customBorder: const CircleBorder(),
-                                  onTap: _togglePlayPause,
-                                  child: Center(
-                                    child: Icon(
-                                      _isPlaying
-                                          ? Icons.pause_rounded
-                                          : Icons.play_arrow_rounded,
-                                      size: 42,
-                                      color: Colors.black,
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 4),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      _formatDuration(_currentPosition),
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.white38,
+                                      ),
+                                    ),
+                                    Text(
+                                      _formatDuration(currentTrack.duration),
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.white38,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        // Primary Playback Controls with Touchless Air Targets
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              // Shuffle Button
+                              IconButton(
+                                icon: Icon(
+                                  Icons.shuffle,
+                                  color: _isShuffle
+                                      ? currentTrack.gradient[0]
+                                      : Colors.white38,
+                                ),
+                                onPressed: () {
+                                  setState(() => _isShuffle = !_isShuffle);
+                                  _showGestureHud(
+                                    title: _isShuffle
+                                        ? 'SHUFFLE ON'
+                                        : 'SHUFFLE OFF',
+                                    subtitle: 'Playlist randomizer',
+                                    icon: Icons.shuffle,
+                                    color: currentTrack.gradient[0],
+                                  );
+                                },
+                              ),
+
+                              // Previous Track Air Target
+                              TouchlessTarget(
+                                id: 'btn_prev_track',
+                                onTouchlessTap: _prevTrack,
+                                onTap: _prevTrack,
+                                child: _buildControlBubble(
+                                  icon: Icons.skip_previous_rounded,
+                                  size: 28,
+                                  onTap: _prevTrack,
+                                ),
+                              ),
+
+                              // Giant Central Play/Pause Air Target
+                              TouchlessTarget(
+                                id: 'btn_play_pause_center',
+                                onTouchlessTap: _togglePlayPause,
+                                onTap: _togglePlayPause,
+                                child: Container(
+                                  width: 76,
+                                  height: 76,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: LinearGradient(
+                                      colors: currentTrack.gradient,
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: currentTrack.gradient[0]
+                                            .withAlpha(120),
+                                        blurRadius: 24,
+                                        spreadRadius: 2,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      customBorder: const CircleBorder(),
+                                      onTap: _togglePlayPause,
+                                      child: Center(
+                                        child: Icon(
+                                          _isPlaying
+                                              ? Icons.pause_rounded
+                                              : Icons.play_arrow_rounded,
+                                          size: 42,
+                                          color: Colors.black,
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
+
+                              // Next Track Air Target
+                              TouchlessTarget(
+                                id: 'btn_next_track',
+                                onTouchlessTap: _nextTrack,
+                                onTap: _nextTrack,
+                                child: _buildControlBubble(
+                                  icon: Icons.skip_next_rounded,
+                                  size: 28,
+                                  onTap: _nextTrack,
+                                ),
+                              ),
+
+                              // Repeat Button
+                              IconButton(
+                                icon: Icon(
+                                  Icons.repeat,
+                                  color: _isRepeat
+                                      ? currentTrack.gradient[0]
+                                      : Colors.white38,
+                                ),
+                                onPressed: () {
+                                  setState(() => _isRepeat = !_isRepeat);
+                                  _showGestureHud(
+                                    title:
+                                        _isRepeat ? 'REPEAT ON' : 'REPEAT OFF',
+                                    subtitle: 'Single track repeat',
+                                    icon: Icons.repeat,
+                                    color: currentTrack.gradient[0],
+                                  );
+                                },
+                              ),
+                            ],
                           ),
+                        ),
 
-                          // Next Track Air Target
-                          TouchlessTarget(
-                            id: 'btn_next_track',
-                            onTouchlessTap: _nextTrack,
-                            onTap: _nextTrack,
-                            child: _buildControlBubble(
-                              icon: Icons.skip_next_rounded,
-                              size: 28,
-                              onTap: _nextTrack,
-                            ),
-                          ),
+                        const Spacer(flex: 1),
 
-                          // Repeat Button
-                          IconButton(
-                            icon: Icon(
-                              Icons.repeat,
-                              color: _isRepeat
-                                  ? currentTrack.gradient[0]
-                                  : Colors.white38,
-                            ),
-                            onPressed: () {
-                              setState(() => _isRepeat = !_isRepeat);
-                              _showGestureHud(
-                                title: _isRepeat ? 'REPEAT ON' : 'REPEAT OFF',
-                                subtitle: 'Single track repeat',
-                                icon: Icons.repeat,
-                                color: currentTrack.gradient[0],
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
+                        // Gesture Quick-Guide Banner
+                        _buildGestureGuideBanner(),
 
-                    const Spacer(flex: 1),
-
-                    // Gesture Quick-Guide Banner
-                    _buildGestureGuideBanner(),
-
-                    const SizedBox(height: 12),
-                  ],
+                        const SizedBox(height: 12),
+                      ],
+                    );
+                  },
                 ),
 
                 // Top Status Bar HUD
@@ -812,8 +835,10 @@ class _TouchlessMediaPlayerScreenState extends State<TouchlessMediaPlayerScreen>
                                   }
                                   return Align(
                                     alignment: Alignment(
-                                      (telemetry.x * 2.0 - 1.0).clamp(-1.0, 1.0),
-                                      (telemetry.y * 2.0 - 1.0).clamp(-1.0, 1.0),
+                                      (telemetry.x * 2.0 - 1.0)
+                                          .clamp(-1.0, 1.0),
+                                      (telemetry.y * 2.0 - 1.0)
+                                          .clamp(-1.0, 1.0),
                                     ),
                                     child: Container(
                                       width: 14,
@@ -856,10 +881,10 @@ class _TouchlessMediaPlayerScreenState extends State<TouchlessMediaPlayerScreen>
     );
   }
 
-  Widget _buildAlbumArtworkCard(MediaTrack track) {
+  Widget _buildAlbumArtworkCard(MediaTrack track, {double size = 220.0}) {
     return Container(
-      width: 240,
-      height: 240,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
         gradient: LinearGradient(
@@ -884,7 +909,8 @@ class _TouchlessMediaPlayerScreenState extends State<TouchlessMediaPlayerScreen>
               height: 190,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white.withAlpha(30), width: 1.5),
+                border:
+                    Border.all(color: Colors.white.withAlpha(30), width: 1.5),
               ),
             ),
           ),
@@ -894,7 +920,8 @@ class _TouchlessMediaPlayerScreenState extends State<TouchlessMediaPlayerScreen>
               height: 130,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white.withAlpha(20), width: 1.5),
+                border:
+                    Border.all(color: Colors.white.withAlpha(20), width: 1.5),
               ),
             ),
           ),
@@ -1072,7 +1099,8 @@ class _TouchlessMediaPlayerScreenState extends State<TouchlessMediaPlayerScreen>
                     track.title,
                     style: TextStyle(
                       color: isCurrent ? const Color(0xFF00E5FF) : Colors.white,
-                      fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                      fontWeight:
+                          isCurrent ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),
                   subtitle: Text(
@@ -1146,11 +1174,11 @@ class _TouchlessMediaPlayerScreenState extends State<TouchlessMediaPlayerScreen>
                       ],
                     ),
                     const SizedBox(height: 12),
-
                     if (detector != null) ...[
                       // Sensor presets
                       const Text('Hardware Preset:',
-                          style: TextStyle(fontSize: 12, color: Colors.white70)),
+                          style:
+                              TextStyle(fontSize: 12, color: Colors.white70)),
                       const SizedBox(height: 6),
                       Wrap(
                         spacing: 8,
@@ -1237,10 +1265,10 @@ class _TouchlessMediaPlayerScreenState extends State<TouchlessMediaPlayerScreen>
                         },
                       ),
                     ],
-
                     const Divider(color: Colors.white12),
                     const Text('🕹️ Manual Gesture Simulator:',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                        style: TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
@@ -1249,8 +1277,8 @@ class _TouchlessMediaPlayerScreenState extends State<TouchlessMediaPlayerScreen>
                         ActionChip(
                           label: const Text('👉 Next Track'),
                           onPressed: () {
-                            _touchlessController
-                                .triggerGesture(TouchlessGestureType.swipeRight);
+                            _touchlessController.triggerGesture(
+                                TouchlessGestureType.swipeRight);
                           },
                         ),
                         ActionChip(
@@ -1343,7 +1371,8 @@ class _AudioVisualizerPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     const int barCount = 36;
     final double barWidth = size.width / (barCount * 1.8);
-    final double spacing = (size.width - (barCount * barWidth)) / (barCount - 1);
+    final double spacing =
+        (size.width - (barCount * barWidth)) / (barCount - 1);
     final paint = Paint()..style = PaintingStyle.fill;
 
     for (int i = 0; i < barCount; i++) {
@@ -1355,7 +1384,8 @@ class _AudioVisualizerPainter extends CustomPainter {
         final wave2 = math.cos((animValue * 4 * math.pi) - (i * 0.2));
         final dynamicScale = (wave1 + wave2 + 2.0) / 4.0;
         final bellCurve = math.sin(normalizedIndex * math.pi);
-        barHeight = (size.height * 0.85 * dynamicScale * bellCurve).clamp(4.0, size.height);
+        barHeight = (size.height * 0.85 * dynamicScale * bellCurve)
+            .clamp(4.0, size.height);
       } else {
         barHeight = 4.0;
       }
