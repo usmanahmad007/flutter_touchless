@@ -1,6 +1,6 @@
 name: flutter_touchless
 description: A hands-free touchless interaction framework for Flutter with air swipes, virtual air cursor, dwell-click activation, head tracking, and proximity wave gestures.
-version: 0.1.1
+version: 0.1.2
 repository: https://github.com/usmanahmad007/flutter_touchless
 issue_tracker: https://github.com/usmanahmad007/flutter_touchless/issues
 homepage: https://github.com/usmanahmad007/flutter_touchless
