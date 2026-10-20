@@ -179,34 +179,40 @@ class OpticalFlowDetector implements TouchlessDetector {
   /// Processes a raw grayscale / Y-plane camera frame.
   ///
   /// Can be called directly from `CameraController.startImageStream`.
-  /// - [luminanceBytes]: Raw 8-bit grayscale pixel buffer.
+  /// - [luminanceBytes]: Raw 8-bit grayscale pixel buffer (e.g. `image.planes[0].bytes`).
   /// - [width]: Image width in pixels.
   /// - [height]: Image height in pixels.
-  /// - [step]: Sub-sampling step (e.g. 4 or 8) for lightning-fast 60 FPS mobile performance.
+  /// - [bytesPerRow]: Optional row stride (e.g. `image.planes[0].bytesPerRow`) to prevent row-padding skew on Android.
+  /// - [step]: Sub-sampling step (default 4) for high-precision, 60 FPS mobile performance.
   void processFrame(
     Uint8List luminanceBytes,
     int width,
     int height, {
-    int step = 6,
+    int? bytesPerRow,
+    int step = 4,
   }) {
     if (!_isRunning || luminanceBytes.isEmpty || width <= 0 || height <= 0) {
       return;
     }
 
+    final rowStride = bytesPerRow ?? width;
     final now = DateTime.now();
     final gridW = width ~/ step;
     final gridH = height ~/ step;
-    final currentDownsampled = Uint8List(gridW * gridH);
+    final totalGridPixels = gridW * gridH;
+    final currentDownsampled = Uint8List(totalGridPixels);
 
     for (int gy = 0; gy < gridH; gy++) {
       final srcY = gy * step;
-      final srcRowOffset = srcY * width;
+      final srcRowOffset = srcY * rowStride;
       final dstRowOffset = gy * gridW;
 
       for (int gx = 0; gx < gridW; gx++) {
         final srcX = gx * step;
-        currentDownsampled[dstRowOffset + gx] =
-            luminanceBytes[srcRowOffset + srcX];
+        final index = srcRowOffset + srcX;
+        if (index < luminanceBytes.length) {
+          currentDownsampled[dstRowOffset + gx] = luminanceBytes[index];
+        }
       }
     }
 
@@ -221,10 +227,12 @@ class OpticalFlowDetector implements TouchlessDetector {
     double totalMotion = 0;
     double weightedX = 0;
     double weightedY = 0;
+    int activePixels = 0;
 
-    for (int i = 0; i < currentDownsampled.length; i++) {
+    for (int i = 0; i < totalGridPixels; i++) {
       final diff = (currentDownsampled[i] - _prevFrame![i]).abs();
       if (diff > threshold) {
+        activePixels++;
         final gx = i % gridW;
         final gy = i ~/ gridW;
         totalMotion += diff;
@@ -235,12 +243,18 @@ class OpticalFlowDetector implements TouchlessDetector {
 
     _prevFrame = currentDownsampled;
 
-    // Minimum motion energy threshold to overcome sensor noise
-    final minEnergy = gridW * gridH * 1.2;
-    _lastMotionMagnitude = (totalMotion / (gridW * gridH * 10)).clamp(0.0, 1.0);
+    // Reject camera auto-exposure flashes where > 55% of the frame changed at once
+    final isGlobalFlash = activePixels > (totalGridPixels * 0.55);
 
-    // If significant motion was detected
-    if (totalMotion > minEnergy) {
+    // Minimum active pixels to qualify as hand motion (at least ~0.3% of the frame or 12 pixels)
+    final minActivePixels = math.max(12, (totalGridPixels * 0.003).round());
+    final hasHandMotion = !isGlobalFlash && (activePixels >= minActivePixels);
+
+    _lastMotionMagnitude =
+        (totalMotion / (totalGridPixels * 6)).clamp(0.0, 1.0);
+
+    // If valid hand motion was detected
+    if (hasHandMotion && totalMotion > 0) {
       final normGx = weightedX / (totalMotion * gridW);
       final normGy = weightedY / (totalMotion * gridH);
 

@@ -129,11 +129,13 @@ class _TouchlessHomeScreenState extends State<TouchlessHomeScreen> {
       await controller.startImageStream((CameraImage image) {
         if (!_isCameraActive) return;
         if (image.planes.isNotEmpty) {
+          final plane = image.planes[0];
           flowDetector.processFrame(
-            image.planes[0].bytes,
+            plane.bytes,
             image.width,
             image.height,
-            step: 6,
+            bytesPerRow: plane.bytesPerRow,
+            step: 4,
           );
         }
       });
@@ -230,10 +232,24 @@ class _TouchlessHomeScreenState extends State<TouchlessHomeScreen> {
                 top: 8,
                 left: 12,
                 right: 12,
-                child: TouchlessStatusBar(
-                  controller: _touchlessController,
-                  detectorLabel: _detectorLabel,
-                ),
+                child: _opticalFlowDetector != null && _isCameraActive
+                    ? ValueListenableBuilder<OpticalFlowTelemetry>(
+                        valueListenable:
+                            _opticalFlowDetector!.telemetryNotifier,
+                        builder: (context, telemetry, _) {
+                          final dirStr = telemetry.isTracking
+                              ? ' • ${telemetry.direction}'
+                              : '';
+                          return TouchlessStatusBar(
+                            controller: _touchlessController,
+                            detectorLabel: '📷 Front Cam$dirStr',
+                          );
+                        },
+                      )
+                    : TouchlessStatusBar(
+                        controller: _touchlessController,
+                        detectorLabel: _detectorLabel,
+                      ),
               ),
 
               // Floating Picture-In-Picture Camera Feed (When active)
