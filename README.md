@@ -30,6 +30,7 @@ A futuristic, zero-native-dependency **hands-free touchless interaction framewor
 
 ## 🌟 Why flutter_touchless?
 
+- 🎧 **Hands-Free Media & Audio Player**: Skip songs, control volume, and play/pause tracks with simple mid-air waves while driving, cooking, or working out.
 - 🧑‍🍳 **Kitchen & Recipe Apps**: Read recipes and flip steps with wet, floury, or greasy hands without smudging your phone screen.
 - 📱 **Hands-Free Feeds**: Scroll short-form reels, TikToks, or articles with quick air swipes from across your desk or treadmill.
 - ♿ **Accessibility (a11y)**: Empower users with limited motor control or tremors using dwell-clicking and head tracking.
