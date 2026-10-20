@@ -246,6 +246,19 @@ class OpticalFlowDetector implements TouchlessDetector {
     // Reject camera auto-exposure flashes where > 55% of the frame changed at once
     final isGlobalFlash = activePixels > (totalGridPixels * 0.55);
 
+    // Detect proximity wave / hand push towards lens for play/pause
+    if (!isGlobalFlash &&
+        activePixels > (totalGridPixels * 0.25) &&
+        activePixels <= (totalGridPixels * 0.55)) {
+      if (now.difference(_lastSwipeTime) > const Duration(milliseconds: 650)) {
+        _emitGesture(
+          TouchlessGestureType.proximityWave,
+          Offset(_smoothX, _smoothY),
+          now,
+        );
+      }
+    }
+
     // Minimum active pixels to qualify as hand motion (at least ~0.3% of the frame or 12 pixels)
     final minActivePixels = math.max(12, (totalGridPixels * 0.003).round());
     final hasHandMotion = !isGlobalFlash && (activePixels >= minActivePixels);
