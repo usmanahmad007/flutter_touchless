@@ -1,7 +1,7 @@
 # flutter_touchless 🖐️✨
 
 [![Pub Version](https://img.shields.io/pub/v/flutter_touchless?color=00E5FF&logo=dart)](https://pub.dev/packages/flutter_touchless)
-[![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Flutter Platform](https://img.shields.io/badge/Platform-Flutter%20%7C%20Android%20%7C%20iOS%20%7C%20Web%20%7C%20Desktop-blue.svg)](https://flutter.dev)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/usmanahmad007/flutter_touchless/pulls)
 
