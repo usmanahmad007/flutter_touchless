@@ -116,9 +116,13 @@ class _TouchlessHomeScreenState extends State<TouchlessHomeScreen> {
 
       await controller.initialize();
 
+      final isFront = camera.lensDirection == CameraLensDirection.front;
       final flowDetector = OpticalFlowDetector(
         smoothingFactor: 0.35,
         swipeSensitivity: 0.22,
+        sensorOrientation: camera.sensorOrientation,
+        isFrontCamera: isFront,
+        gain: 1.8,
       );
       await flowDetector.start();
 
@@ -206,6 +210,7 @@ class _TouchlessHomeScreenState extends State<TouchlessHomeScreen> {
                       isCameraActive: _isCameraActive,
                       isCameraInitializing: _isCameraInitializing,
                       cameraController: _cameraController,
+                      opticalFlowDetector: _opticalFlowDetector,
                       onToggleCamera: _toggleDetector,
                       simulatedPos: _simulatedNormalized,
                       onSimulateMove: (pos) {
@@ -239,8 +244,8 @@ class _TouchlessHomeScreenState extends State<TouchlessHomeScreen> {
                   top: 76,
                   right: 16,
                   child: Container(
-                    width: 90,
-                    height: 120,
+                    width: 96,
+                    height: 128,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
@@ -255,9 +260,49 @@ class _TouchlessHomeScreenState extends State<TouchlessHomeScreen> {
                       ],
                     ),
                     clipBehavior: Clip.antiAlias,
-                    child: AspectRatio(
-                      aspectRatio: _cameraController!.value.aspectRatio,
-                      child: CameraPreview(_cameraController!),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        AspectRatio(
+                          aspectRatio: _cameraController!.value.aspectRatio,
+                          child: CameraPreview(_cameraController!),
+                        ),
+                        if (_opticalFlowDetector != null)
+                          ValueListenableBuilder<OpticalFlowTelemetry>(
+                            valueListenable:
+                                _opticalFlowDetector!.telemetryNotifier,
+                            builder: (context, telemetry, _) {
+                              if (!telemetry.isTracking) {
+                                return const SizedBox.shrink();
+                              }
+                              return Align(
+                                alignment: Alignment(
+                                  (telemetry.x * 2.0 - 1.0).clamp(-1.0, 1.0),
+                                  (telemetry.y * 2.0 - 1.0).clamp(-1.0, 1.0),
+                                ),
+                                child: Container(
+                                  width: 14,
+                                  height: 14,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFF4081),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 2,
+                                    ),
+                                    boxShadow: const [
+                                      BoxShadow(
+                                        color: Color(0xFFFF4081),
+                                        blurRadius: 6,
+                                        spreadRadius: 2,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                      ],
                     ),
                   ),
                 ),
@@ -1005,6 +1050,7 @@ class _SettingsTab extends StatefulWidget {
   final bool isCameraActive;
   final bool isCameraInitializing;
   final CameraController? cameraController;
+  final OpticalFlowDetector? opticalFlowDetector;
   final VoidCallback onToggleCamera;
   final Offset simulatedPos;
   final ValueChanged<Offset> onSimulateMove;
@@ -1015,6 +1061,7 @@ class _SettingsTab extends StatefulWidget {
     required this.isCameraActive,
     required this.isCameraInitializing,
     required this.cameraController,
+    this.opticalFlowDetector,
     required this.onToggleCamera,
     required this.simulatedPos,
     required this.onSimulateMove,
@@ -1130,6 +1177,323 @@ class _SettingsTabState extends State<_SettingsTab> {
               ),
             ),
           ),
+
+          // Live Motion Tracking & Calibration Section (When Camera is Active)
+          if (widget.opticalFlowDetector != null) ...[
+            const SizedBox(height: 20),
+            const Text(
+              '🧭 Motion Tracking & Sensor Calibration',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Live optical flow telemetry, compass direction, and axis alignment',
+              style: TextStyle(fontSize: 12, color: Colors.white.withAlpha(150)),
+            ),
+            const SizedBox(height: 12),
+
+            // Live Direction Telemetry Card
+            ValueListenableBuilder<OpticalFlowTelemetry>(
+              valueListenable: widget.opticalFlowDetector!.telemetryNotifier,
+              builder: (context, telemetry, _) {
+                final isMoving = telemetry.isTracking;
+                return Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF161B22),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isMoving
+                          ? const Color(0xFF00E5FF).withAlpha(140)
+                          : Colors.white.withAlpha(25),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: isMoving
+                                      ? const Color(0xFF00E5FF)
+                                      : Colors.white30,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Live Motion:',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isMoving
+                                  ? const Color(0xFF00E5FF).withAlpha(35)
+                                  : Colors.white.withAlpha(15),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isMoving
+                                    ? const Color(0xFF00E5FF)
+                                    : Colors.white24,
+                              ),
+                            ),
+                            child: Text(
+                              telemetry.direction,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: isMoving
+                                    ? const Color(0xFF00E5FF)
+                                    : Colors.white60,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Centroid: (${(telemetry.x * 100).toInt()}%, ${(telemetry.y * 100).toInt()}%)',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.white60,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: LinearProgressIndicator(
+                                    value: (telemetry.magnitude * 2.5)
+                                        .clamp(0.0, 1.0),
+                                    backgroundColor: Colors.white10,
+                                    color: const Color(0xFF00E5FF),
+                                    minHeight: 6,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Sensor: ${widget.opticalFlowDetector!.sensorOrientation}° • ${widget.opticalFlowDetector!.isFrontCamera ? "Front Camera" : "Back Camera"}',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.white.withAlpha(110),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 14),
+
+            // Quick Hardware Presets
+            const Text(
+              'Hardware Presets',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ChoiceChip(
+                  label: const Text('📱 Pixel Front (270°)'),
+                  selected: widget.opticalFlowDetector!.swapAxes &&
+                      widget.opticalFlowDetector!.invertX &&
+                      widget.opticalFlowDetector!.invertY,
+                  onSelected: (_) {
+                    setState(() {
+                      widget.opticalFlowDetector!.configureOrientation(
+                        swapAxes: true,
+                        invertX: true,
+                        invertY: true,
+                      );
+                    });
+                  },
+                ),
+                ChoiceChip(
+                  label: const Text('📸 Back Cam (90°)'),
+                  selected: widget.opticalFlowDetector!.swapAxes &&
+                      !widget.opticalFlowDetector!.invertX &&
+                      !widget.opticalFlowDetector!.invertY,
+                  onSelected: (_) {
+                    setState(() {
+                      widget.opticalFlowDetector!.configureOrientation(
+                        swapAxes: true,
+                        invertX: false,
+                        invertY: false,
+                      );
+                    });
+                  },
+                ),
+                ChoiceChip(
+                  label: const Text('💻 Desktop/Webcam (0°)'),
+                  selected: !widget.opticalFlowDetector!.swapAxes &&
+                      widget.opticalFlowDetector!.invertX &&
+                      !widget.opticalFlowDetector!.invertY,
+                  onSelected: (_) {
+                    setState(() {
+                      widget.opticalFlowDetector!.configureOrientation(
+                        swapAxes: false,
+                        invertX: true,
+                        invertY: false,
+                      );
+                    });
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Axis Calibration Switches
+            SwitchListTile(
+              title: const Text('Swap X / Y Axes',
+                  style: TextStyle(fontSize: 14)),
+              subtitle: const Text(
+                'Maps landscape camera buffer to portrait screen (fixes diagonal/transposed drift)',
+                style: TextStyle(fontSize: 11),
+              ),
+              value: widget.opticalFlowDetector!.swapAxes,
+              activeColor: const Color(0xFF00E5FF),
+              contentPadding: EdgeInsets.zero,
+              onChanged: (val) {
+                setState(() {
+                  widget.opticalFlowDetector!.swapAxes = val;
+                });
+              },
+            ),
+            SwitchListTile(
+              title: const Text('Invert Horizontal (Mirror X)',
+                  style: TextStyle(fontSize: 14)),
+              subtitle: const Text(
+                'Inverts left/right tracking to match mirror selfie motion',
+                style: TextStyle(fontSize: 11),
+              ),
+              value: widget.opticalFlowDetector!.invertX,
+              activeColor: const Color(0xFF00E5FF),
+              contentPadding: EdgeInsets.zero,
+              onChanged: (val) {
+                setState(() {
+                  widget.opticalFlowDetector!.invertX = val;
+                });
+              },
+            ),
+            SwitchListTile(
+              title: const Text('Invert Vertical (Invert Y)',
+                  style: TextStyle(fontSize: 14)),
+              subtitle: const Text(
+                'Inverts up/down tracking direction',
+                style: TextStyle(fontSize: 11),
+              ),
+              value: widget.opticalFlowDetector!.invertY,
+              activeColor: const Color(0xFF00E5FF),
+              contentPadding: EdgeInsets.zero,
+              onChanged: (val) {
+                setState(() {
+                  widget.opticalFlowDetector!.invertY = val;
+                });
+              },
+            ),
+            const SizedBox(height: 14),
+
+            // Reach Gain Slider
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Reach Gain Multiplier',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  '${widget.opticalFlowDetector!.gain.toStringAsFixed(1)}x',
+                  style: const TextStyle(
+                    color: Color(0xFF00E5FF),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            Slider(
+              value: widget.opticalFlowDetector!.gain,
+              min: 1.0,
+              max: 3.0,
+              divisions: 20,
+              activeColor: const Color(0xFF00E5FF),
+              label: '${widget.opticalFlowDetector!.gain.toStringAsFixed(1)}x',
+              onChanged: (val) {
+                setState(() {
+                  widget.opticalFlowDetector!.gain = val;
+                });
+              },
+            ),
+            Text(
+              'Higher gain lets subtle hand movements reach screen edges comfortably',
+              style: TextStyle(fontSize: 11, color: Colors.white.withAlpha(140)),
+            ),
+            const SizedBox(height: 16),
+
+            // Noise Gate Threshold Slider
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Noise Gate Threshold',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  '${widget.opticalFlowDetector!.threshold}',
+                  style: const TextStyle(
+                    color: Color(0xFF00E5FF),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            Slider(
+              value: widget.opticalFlowDetector!.threshold.toDouble(),
+              min: 10,
+              max: 35,
+              divisions: 25,
+              activeColor: const Color(0xFF00E5FF),
+              label: '${widget.opticalFlowDetector!.threshold}',
+              onChanged: (val) {
+                setState(() {
+                  widget.opticalFlowDetector!.threshold = val.round();
+                });
+              },
+            ),
+            Text(
+              'Higher threshold rejects background shadows and ambient noise',
+              style: TextStyle(fontSize: 11, color: Colors.white.withAlpha(140)),
+            ),
+          ],
           const SizedBox(height: 20),
 
           // Dwell Duration Slider

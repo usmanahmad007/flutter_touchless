@@ -26,26 +26,121 @@ class OpticalFlowDetector implements TouchlessDetector {
   // Smoothing state (Exponential Moving Average)
   double _smoothX = 0.5;
   double _smoothY = 0.5;
-  final double _alpha;
+  double _alpha;
+
+  /// Hardware sensor orientation in degrees (0, 90, 180, 270).
+  int sensorOrientation;
+
+  /// Whether the camera is a front-facing selfie camera.
+  bool isFrontCamera;
+
+  /// Whether to swap X and Y coordinates (necessary for mobile cameras in portrait).
+  bool swapAxes;
+
+  /// Whether to invert the horizontal X axis.
+  bool invertX;
+
+  /// Whether to invert the vertical Y axis.
+  bool invertY;
+
+  /// Coordinate reach gain multiplier (1.0 to 3.5).
+  /// Expands center motion range so hand reaches screen edges comfortably.
+  double gain;
+
+  /// Minimum luminance intensity difference between frames to register motion.
+  int threshold;
+
+  // Live telemetry
+  double _lastMotionMagnitude = 0.0;
+  String _dominantDirection = 'Still';
+
+  /// Live motion magnitude (0.0 to 1.0+).
+  double get lastMotionMagnitude => _lastMotionMagnitude;
+
+  /// Live dominant movement direction string ('Left ⬅️', 'Right ➡️', 'Up ⬆️', 'Down ⬇️', 'Still 🎯').
+  String get dominantDirection => _dominantDirection;
+
+  /// Real-time telemetry notifier for HUDs, calibration panels, and diagnostics.
+  final ValueNotifier<OpticalFlowTelemetry> telemetryNotifier =
+      ValueNotifier<OpticalFlowTelemetry>(const OpticalFlowTelemetry());
+
+  /// Current live telemetry snapshot.
+  OpticalFlowTelemetry get currentTelemetry => telemetryNotifier.value;
+
+  /// Current smoothing factor (0.05 to 0.95).
+  double get smoothingFactor => _alpha;
+  set smoothingFactor(double val) => _alpha = val.clamp(0.05, 0.95);
 
   // Velocity tracking for swipe detection
   final List<_MotionSample> _motionHistory = [];
   DateTime _lastSwipeTime = DateTime.fromMillisecondsSinceEpoch(0);
   final Duration _swipeCooldown;
   final double _swipeSensitivity;
+  bool _isDisposed = false;
 
   /// Creates an [OpticalFlowDetector].
   ///
-  /// - [smoothingFactor]: 0.1 (very smooth, slightly laggy) to 0.8 (responsive, slightly noisy). Default 0.35.
-  /// - [swipeSensitivity]: Motion magnitude threshold for swipe triggers. Default 0.25.
-  /// - [swipeCooldown]: Delay between consecutive swipe triggers to prevent double-firing.
+  /// - [sensorOrientation]: Degrees of hardware sensor rotation (typically 270 on Android front camera, 0 on webcams).
+  /// - [isFrontCamera]: If true, applies mirror effect.
+  /// - [gain]: Coordinate amplifier (default 1.8x) so hand motion comfortably reaches all screen edges.
+  /// - [threshold]: Minimum pixel difference to count as motion (default 18).
   OpticalFlowDetector({
     double smoothingFactor = 0.35,
     double swipeSensitivity = 0.25,
     Duration swipeCooldown = const Duration(milliseconds: 400),
+    this.sensorOrientation = 0,
+    this.isFrontCamera = true,
+    bool? swapAxes,
+    bool? invertX,
+    bool? invertY,
+    this.gain = 1.8,
+    this.threshold = 18,
   })  : _alpha = smoothingFactor.clamp(0.05, 0.95),
         _swipeSensitivity = swipeSensitivity,
-        _swipeCooldown = swipeCooldown;
+        _swipeCooldown = swipeCooldown,
+        swapAxes = swapAxes ??
+            (sensorOrientation == 90 || sensorOrientation == 270),
+        invertX = invertX ??
+            (sensorOrientation == 270
+                ? true
+                : (sensorOrientation == 90 ? false : isFrontCamera)),
+        invertY = invertY ?? (sensorOrientation == 270);
+
+  /// Configures sensor orientation and axis mapping.
+  void configureOrientation({
+    int? sensorOrientation,
+    bool? isFrontCamera,
+    bool? swapAxes,
+    bool? invertX,
+    bool? invertY,
+    double? gain,
+    int? threshold,
+  }) {
+    if (sensorOrientation != null) this.sensorOrientation = sensorOrientation;
+    if (isFrontCamera != null) this.isFrontCamera = isFrontCamera;
+    if (gain != null) this.gain = gain;
+    if (threshold != null) this.threshold = threshold;
+
+    if (swapAxes != null) {
+      this.swapAxes = swapAxes;
+    } else if (sensorOrientation != null) {
+      this.swapAxes = (sensorOrientation == 90 || sensorOrientation == 270);
+    }
+
+    if (invertX != null) {
+      this.invertX = invertX;
+    } else if (sensorOrientation != null) {
+      this.invertX = (sensorOrientation == 270
+          ? true
+          : (sensorOrientation == 90 ? false : this.isFrontCamera));
+    }
+
+    if (invertY != null) {
+      this.invertY = invertY;
+    } else if (sensorOrientation != null) {
+      this.invertY = (sensorOrientation == 270);
+    }
+  }
 
   @override
   Stream<TouchlessPoint> get trackingStream => _trackingController.stream;
@@ -73,9 +168,12 @@ class OpticalFlowDetector implements TouchlessDetector {
 
   @override
   Future<void> dispose() async {
+    if (_isDisposed) return;
+    _isDisposed = true;
     _isRunning = false;
     await _trackingController.close();
     await _gestureController.close();
+    telemetryNotifier.dispose();
   }
 
   /// Processes a raw grayscale / Y-plane camera frame.
@@ -123,7 +221,6 @@ class OpticalFlowDetector implements TouchlessDetector {
     double totalMotion = 0;
     double weightedX = 0;
     double weightedY = 0;
-    const threshold = 18; // Minimum intensity difference to count as motion
 
     for (int i = 0; i < currentDownsampled.length; i++) {
       final diff = (currentDownsampled[i] - _prevFrame![i]).abs();
@@ -138,15 +235,48 @@ class OpticalFlowDetector implements TouchlessDetector {
 
     _prevFrame = currentDownsampled;
 
+    // Minimum motion energy threshold to overcome sensor noise
+    final minEnergy = gridW * gridH * 1.2;
+    _lastMotionMagnitude = (totalMotion / (gridW * gridH * 10)).clamp(0.0, 1.0);
+
     // If significant motion was detected
-    if (totalMotion > (gridW * gridH * 1.2)) {
-      // Mirrored horizontal coordinate (selfie camera behaves like a mirror)
-      final rawX = 1.0 - (weightedX / (totalMotion * gridW));
-      final rawY = weightedY / (totalMotion * gridH);
+    if (totalMotion > minEnergy) {
+      final normGx = weightedX / (totalMotion * gridW);
+      final normGy = weightedY / (totalMotion * gridH);
+
+      double mappedX;
+      double mappedY;
+
+      if (swapAxes) {
+        mappedX = invertX ? (1.0 - normGy) : normGy;
+        mappedY = invertY ? (1.0 - normGx) : normGx;
+      } else {
+        mappedX = invertX ? (1.0 - normGx) : normGx;
+        mappedY = invertY ? (1.0 - normGy) : normGy;
+      }
+
+      // Apply reach gain centered around 0.5 so motion comfortably spans entire screen
+      if (gain != 1.0) {
+        mappedX = ((mappedX - 0.5) * gain + 0.5).clamp(0.0, 1.0);
+        mappedY = ((mappedY - 0.5) * gain + 0.5).clamp(0.0, 1.0);
+      }
+
+      // Compute delta vector for direction telemetry
+      final dx = mappedX - _smoothX;
+      final dy = mappedY - _smoothY;
+      if (math.sqrt(dx * dx + dy * dy) > 0.015) {
+        if (dx.abs() > dy.abs()) {
+          _dominantDirection = dx > 0 ? 'Right ➡️' : 'Left ⬅️';
+        } else {
+          _dominantDirection = dy > 0 ? 'Down ⬇️' : 'Up ⬆️';
+        }
+      } else {
+        _dominantDirection = 'Holding 🎯';
+      }
 
       // Exponential moving average filter
-      _smoothX = _smoothX + _alpha * (rawX - _smoothX);
-      _smoothY = _smoothY + _alpha * (rawY - _smoothY);
+      _smoothX = _smoothX + _alpha * (mappedX - _smoothX);
+      _smoothY = _smoothY + _alpha * (mappedY - _smoothY);
 
       final point = TouchlessPoint(
         x: _smoothX,
@@ -157,12 +287,32 @@ class OpticalFlowDetector implements TouchlessDetector {
 
       _trackingController.add(point);
 
+      if (!_isDisposed) {
+        telemetryNotifier.value = OpticalFlowTelemetry(
+          magnitude: _lastMotionMagnitude,
+          direction: _dominantDirection,
+          x: _smoothX,
+          y: _smoothY,
+          isTracking: true,
+        );
+      }
+
       // Analyze motion velocity for swipe gesture
       _analyzeSwipe(point, now);
     } else {
+      _dominantDirection = 'Still';
       // Motion faded
       if (_motionHistory.isNotEmpty) {
         _motionHistory.clear();
+      }
+      if (!_isDisposed) {
+        telemetryNotifier.value = OpticalFlowTelemetry(
+          magnitude: _lastMotionMagnitude,
+          direction: 'Still',
+          x: _smoothX,
+          y: _smoothY,
+          isTracking: false,
+        );
       }
     }
   }
@@ -217,6 +367,33 @@ class OpticalFlowDetector implements TouchlessDetector {
     );
     _gestureController.add(event);
   }
+}
+
+/// Real-time motion telemetry emitted by [OpticalFlowDetector].
+class OpticalFlowTelemetry {
+  /// Motion magnitude energy (0.0 to 1.0+).
+  final double magnitude;
+
+  /// Current dominant movement direction ('Left ⬅️', 'Right ➡️', 'Up ⬆️', 'Down ⬇️', 'Still 🎯', etc.).
+  final String direction;
+
+  /// Current smoothed normalized horizontal X coordinate (0.0 to 1.0).
+  final double x;
+
+  /// Current smoothed normalized vertical Y coordinate (0.0 to 1.0).
+  final double y;
+
+  /// Whether active motion is currently tracked.
+  final bool isTracking;
+
+  /// Creates an [OpticalFlowTelemetry] snapshot.
+  const OpticalFlowTelemetry({
+    this.magnitude = 0.0,
+    this.direction = 'Still',
+    this.x = 0.5,
+    this.y = 0.5,
+    this.isTracking = false,
+  });
 }
 
 class _MotionSample {

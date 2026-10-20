@@ -37,6 +37,60 @@ void main() {
       await detector.dispose();
     });
 
+    test('OpticalFlowDetector configures hardware sensor orientations properly',
+        () async {
+      // Android Front Camera (270°)
+      final frontCam = OpticalFlowDetector(sensorOrientation: 270);
+      expect(frontCam.swapAxes, isTrue);
+      expect(frontCam.invertX, isTrue);
+      expect(frontCam.invertY, isTrue);
+      await frontCam.dispose();
+
+      // Android Back Camera (90°)
+      final backCam = OpticalFlowDetector(sensorOrientation: 90);
+      expect(backCam.swapAxes, isTrue);
+      expect(backCam.invertX, isFalse);
+      expect(backCam.invertY, isFalse);
+      await backCam.dispose();
+
+      // Desktop / Webcam (0°)
+      final webcam = OpticalFlowDetector(sensorOrientation: 0, isFrontCamera: true);
+      expect(webcam.swapAxes, isFalse);
+      expect(webcam.invertX, isTrue);
+      expect(webcam.invertY, isFalse);
+      await webcam.dispose();
+    });
+
+    test('OpticalFlowDetector updates real-time telemetryNotifier on motion',
+        () async {
+      final detector = OpticalFlowDetector(
+        sensorOrientation: 270,
+        gain: 2.0,
+      );
+      await detector.start();
+
+      expect(detector.currentTelemetry.direction, 'Still');
+      expect(detector.currentTelemetry.isTracking, isFalse);
+
+      const width = 80;
+      const height = 60;
+      final frame1 = Uint8List(width * height);
+      detector.processFrame(frame1, width, height, step: 4);
+
+      final frame2 = Uint8List(width * height);
+      for (int y = 10; y < 30; y++) {
+        for (int x = 10; x < 30; x++) {
+          frame2[y * width + x] = 220;
+        }
+      }
+      detector.processFrame(frame2, width, height, step: 4);
+
+      expect(detector.currentTelemetry.isTracking, isTrue);
+      expect(detector.currentTelemetry.magnitude, greaterThan(0.0));
+
+      await detector.dispose();
+    });
+
     test('ProximityWaveDetector detects valid hand wave', () async {
       final detector = ProximityWaveDetector(
         minWaveDuration: const Duration(milliseconds: 50),
